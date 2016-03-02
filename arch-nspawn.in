@@ -80,7 +80,7 @@ copy_hostconf () {
 	[[ -n $makepkg_conf ]] && cp $makepkg_conf "$working_dir/etc/makepkg.conf"
 	[[ -n $mirrors_conf ]] && cp ${mirrors_conf} "${working_dir}/etc/pacman-mirrors.conf"
 
-	branch=$(cat "${working_dir}/etc/pacman-mirrors.conf" | grep '^Branch=' | sed 's/Branch=\s*//g')
+	branch=$(cat "${working_dir}/etc/pacman-mirrors.conf" | grep '^Branch = ' | sed 's/Branch = \s*//g')
 	host_mirror=$(echo "$host_mirror" | sed -E "s#/branch/#/${branch}/#")
 	echo "Server = $host_mirror" >"$working_dir/etc/pacman.d/mirrorlist"
 	
