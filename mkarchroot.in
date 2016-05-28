@@ -72,7 +72,7 @@ fi
 
 # Workaround when creating a chroot in a branch different of the host
 if [[ -n $pac_conf ]] && [[ -n $mirrors_conf ]]; then
-	host_mirror=$(pacman -Sddp extra/devtools 2>/dev/null | sed -E "s#(.*/)(.*/)extra/.*#\1branch/\$repo/\$arch#")
+	host_mirror=$(pacman --cachedir /doesnt/exist -Sddp extra/devtools 2>/dev/null | sed -E "s#(.*/)(.*/)extra/.*#\1branch/\$repo/\$arch#")
 	[[ $host_mirror == *file://* ]] && host_mirror_path=$(echo "$host_mirror" | sed -r 's#file://(/.*)/\$repo/os/\$arch#\1#g')
 	branch=$(cat "$mirrors_conf" | grep '^Branch = ' | sed 's/Branch = \s*//g')
 	host_mirror=$(echo "$host_mirror" | sed -E "s#/branch/#/${branch}/#")
