@@ -306,7 +306,7 @@ fi
 
 umask 0022
 
-load_vars "$USER_HOME/.makepkg.conf"
+load_vars "${XDG_CONFIG_HOME:-$USER_HOME/.config}/pacman/makepkg.conf" || load_vars "$USER_HOME/.makepkg.conf"
 load_vars /etc/makepkg.conf
 
 # Use PKGBUILD directory if these don't exist
