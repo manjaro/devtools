@@ -162,8 +162,6 @@ slock() {
 # usage: pkgver_equal( $pkgver1, $pkgver2 )
 ##
 pkgver_equal() {
-	local left right
-
 	if [[ $1 = *-* && $2 = *-* ]]; then
 		# if both versions have a pkgrel, then they must be an exact match
 		[[ $1 = "$2" ]]
@@ -182,7 +180,7 @@ pkgver_equal() {
 find_cached_package() {
 	local searchdirs=("$PWD" "$PKGDEST") results=()
 	local targetname=$1 targetver=$2 targetarch=$3
-	local dir pkg pkgbasename pkgparts name ver rel arch size r results
+	local dir pkg pkgbasename name ver rel arch r results
 
 	for dir in "${searchdirs[@]}"; do
 		[[ -d $dir ]] || continue
