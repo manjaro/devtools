@@ -9,8 +9,7 @@
 # GNU General Public License for more details.
 
 m4_include(lib/common.sh)
-
-CHROOT_VERSION='v4'
+m4_include(lib/archroot.sh)
 
 working_dir=''
 
@@ -27,8 +26,6 @@ usage() {
 	exit 1
 }
 
-orig_argv=("$@")
-
 while getopts 'hC:M:S:c:' arg; do
 	case "$arg" in
 		C) pac_conf="$OPTARG" ;;
@@ -42,7 +39,7 @@ done
 shift $(($OPTIND - 1))
 
 (( $# < 1 )) && die 'You must specify a directory.'
-check_root "$0" "${orig_argv[@]}"
+check_root
 
 working_dir=$(readlink -f "$1")
 shift 1

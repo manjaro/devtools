@@ -9,6 +9,7 @@
 # GNU General Public License for more details.
 
 m4_include(lib/common.sh)
+m4_include(lib/archroot.sh)
 
 shopt -s nullglob
 
@@ -21,6 +22,7 @@ run_namcap=false
 temp_chroot=false
 chrootdir=
 passeddir=
+makepkg_user=
 declare -a install_pkgs
 declare -i ret=0
 
@@ -46,6 +48,10 @@ usage() {
 	echo 'command:'
 	echo '    mkmanjaroroot <chrootdir>/root base-devel'
 	echo ''
+	echo 'This script reads {SRC,SRCPKG,PKG,LOG}DEST, MAKEFLAGS and PACKAGER'
+	echo 'from makepkg.conf(5), if those variables are not part of the'
+	echo 'environment.'
+	echo ''
 	echo "Default makepkg args: ${makepkg_args[*]}"
 	echo ''
 	echo 'Flags:'
@@ -63,6 +69,7 @@ usage() {
 	echo "           Default: $copy"
 	echo '-n         Run namcap on the package'
 	echo '-T         Build in a temporary directory'
+	echo '-U         Run makepkg as a specified user'
 	exit 1
 }
 
@@ -89,11 +96,9 @@ create_chroot() {
 		slock 8 "$chrootdir/root.lock" "Locking clean chroot"
 
 		stat_busy "Creating clean working copy [$copy]"
-		if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
-			if [[ -d $copydir ]]; then
-				btrfs subvolume delete "$copydir" >/dev/null ||
-					die "Unable to delete subvolume %s" "$copydir"
-			fi
+		if is_btrfs "$chrootdir" && ! mountpoint -q "$copydir"; then
+			subvolume_delete_recursive "$copydir" ||
+				die "Unable to delete subvolume %s" "$copydir"
 			btrfs subvolume snapshot "$chrootdir/root" "$copydir" >/dev/null ||
 				die "Unable to create subvolume %s" "$copydir"
 		else
@@ -112,7 +117,7 @@ create_chroot() {
 
 clean_temporary() {
 	stat_busy "Removing temporary copy [$copy]"
-	if [[ "$chroottype" == btrfs ]] && ! mountpoint -q "$copydir"; then
+	if is_btrfs "$chrootdir" && ! mountpoint -q "$copydir"; then
 		btrfs subvolume delete "$copydir" >/dev/null ||
 			die "Unable to delete subvolume %s" "$copydir"
 	else
@@ -214,13 +219,13 @@ download_sources() {
 	chmod 1777 "$builddir"
 
 	# Ensure sources are downloaded
-	if [[ -n $SUDO_USER ]]; then
-		sudo -u $SUDO_USER env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
+	makepkg_user=${makepkg_user:-$SUDO_USER}
+	if [[ -n $makepkg_user ]]; then
+		sudo -u "$makepkg_user" env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
 			makepkg --config="$copydir/etc/makepkg.conf" --verifysource -o
 	else
-		( export SRCDEST BUILDDIR="$builddir"
-			makepkg --asroot --config="$copydir/etc/makepkg.conf" --verifysource -o
-		)
+		error "Running makepkg as root is not allowed."
+		exit 1
 	fi
 	(( $? != 0 )) && die "Could not download sources."
 
@@ -252,9 +257,7 @@ move_products() {
 }
 # }}}
 
-orig_argv=("$@")
-
-while getopts 'hcur:I:l:nTD:d:' arg; do
+while getopts 'hcur:I:l:nTD:d:U:' arg; do
 	case "$arg" in
 		c) clean_first=true ;;
 		D) bindmounts_ro+=(--bind-ro="$OPTARG") ;;
@@ -265,21 +268,20 @@ while getopts 'hcur:I:l:nTD:d:' arg; do
 		l) copy="$OPTARG" ;;
 		n) run_namcap=true; makepkg_args+=(-i) ;;
 		T) temp_chroot=true; copy+="-$$" ;;
+		U) makepkg_user="$OPTARG" ;;
 		h|*) usage ;;
 	esac
 done
 
 [[ ! -f PKGBUILD && -z "${install_pkgs[*]}" ]] && die 'This must be run in a directory containing a PKGBUILD.'
+[[ -n $makepkg_user && -z $(id -u "$makepkg_user") ]] && die 'Invalid makepkg user.'
 
-check_root "$0" "${orig_argv[@]}"
+check_root
 
 # Canonicalize chrootdir, getting rid of trailing /
 chrootdir=$(readlink -e "$passeddir")
 [[ ! -d $chrootdir ]] && die "No chroot dir defined, or invalid path '%s'" "$passeddir"
 [[ ! -d $chrootdir/root ]] && die "Missing chroot dir root directory. Try using: mkmanjaroroot %s/root base-devel" "$chrootdir"
-
-# Detect chrootdir filesystem type
-chroottype=$(stat -f -c %T "$chrootdir")
 
 if [[ ${copy:0:1} = / ]]; then
 	copydir=$copy
