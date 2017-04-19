@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: Unspecified
 
 shopt -s extglob
 
@@ -12,8 +13,10 @@ else
 fi
 
 # Source user-specific makepkg.conf overrides
-if [[ -r ~/.makepkg.conf ]]; then
-	source ~/.makepkg.conf
+if [[ -r "${XDG_CONFIG_HOME:-$HOME/.config}/pacman/makepkg.conf" ]]; then
+	source "${XDG_CONFIG_HOME:-$HOME/.config}/pacman/makepkg.conf"
+elif [[ -r "$HOME/.makepkg.conf" ]]; then
+	source "$HOME/.makepkg.conf"
 fi
 
 if [[ ! -f PKGBUILD ]]; then
@@ -69,8 +72,8 @@ for _pkgname in "${pkgname[@]}"; do
 		msg "Sonames differ in $_pkgname!"
 		echo "$diff_output"
 	else
-		msg "No soname differences for $_pkgname."
+		msg "No soname differences for %s." "$_pkgname"
 	fi
 done
 
-msg "Files saved to $TEMPDIR"
+msg "Files saved to %s" "$TEMPDIR"

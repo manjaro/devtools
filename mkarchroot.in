@@ -1,4 +1,6 @@
 #!/bin/bash
+# License: GNU GPLv2
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; version 2 of the License.
@@ -13,6 +15,8 @@ m4_include(lib/archroot.sh)
 
 working_dir=''
 
+files=()
+
 usage() {
 	echo "Usage: ${0##*/} [options] working-dir package-list..."
 	echo ' options:'
@@ -20,18 +24,22 @@ usage() {
 	echo '    -M <file>     Location of a makepkg config file'
 	echo '    -S <file>     Location of a pacman-mirrors config file'
 	echo '    -c <dir>      Set pacman cache'
+	echo '    -f <file>     Copy file from the host to the chroot'
+	echo '    -s            Do not run setarch'
 	echo '    -h            This message'
 	exit 1
 }
 
-while getopts 'hC:M:S:c:' arg; do
+while getopts 'hC:M:S:c:f:s' arg; do
 	case "$arg" in
 		C) pac_conf="$OPTARG" ;;
 		M) makepkg_conf="$OPTARG" ;;
 		S) mirrors_conf="$OPTARG" ;;
 		c) cache_dir="$OPTARG" ;;
+		f) files+=("$OPTARG") ;;
+		s) nosetarch=1 ;;
 		h|?) usage ;;
-		*) error "invalid argument '$arg'"; usage ;;
+		*) error "invalid argument '%s'" "$arg"; usage ;;
 	esac
 done
 shift $(($OPTIND - 1))
@@ -67,6 +75,16 @@ if is_btrfs "$working_dir"; then
 	chmod 0755 "$working_dir"
 fi
 
+for file in "${files[@]}"; do
+	mkdir -p "$(dirname "$working_dir$file")"
+	cp "$file" "$working_dir$file"
+done
+
+_env=()
+while read -r varname; do
+	_env+=("$varname=${!varname}")
+done < <(declare -x | sed -r 's/^declare -x ([^=]*)=.*/\1/' | grep -i '_proxy$')
+
 # Workaround when creating a chroot in a branch different of the host
 if [[ -n $pac_conf ]] && [[ -n $mirrors_conf ]]; then
 	host_mirror=$(pacman --cachedir /doesnt/exist -Sddp extra/devtools 2>/dev/null | sed -E "s#(.*/)(.*/)extra/.*#\1branch/\$repo/\$arch#")
@@ -75,11 +93,13 @@ if [[ -n $pac_conf ]] && [[ -n $mirrors_conf ]]; then
 	host_mirror=$(echo "$host_mirror" | sed -E "s#/branch/#/${branch}/#")
 	pac_base="$working_dir/pacman-pacstrap.conf"
 	sed "s#Include = /etc/pacman.d/mirrorlist#Server = ${host_mirror}#g" $pac_conf > $pac_base
+    env -i "${_env[@]}" \
 	pacstrap -GMcd ${pac_base:+-C "$pac_base"} "$working_dir" \
 	   "${cache_dirs[@]/#/--cachedir=}" "$@" || die 'Failed to install all packages'
 else
-	pacstrap -GMcd ${pac_conf:+-C "$pac_conf"} "$working_dir" \
-	   "${cache_dirs[@]/#/--cachedir=}" "$@" || die 'Failed to install all packages'
+    env -i "${_env[@]}" \
+    pacstrap -GMcd ${pac_conf:+-C "$pac_conf"} "$working_dir" \
+       "${cache_dirs[@]/#/--cachedir=}" "$@" || die 'Failed to install all packages'
 fi
 
 [[ -f "$working_dir/pacman-pacstrap.conf" ]] && rm "$working_dir/pacman-pacstrap.conf"
@@ -91,6 +111,7 @@ echo "$CHROOT_VERSION" > "$working_dir/.manjaro-chroot"
 systemd-machine-id-setup --root="$working_dir"
 
 exec arch-nspawn \
+	${nosetarch:+-s} \
 	${pac_conf:+-C "$pac_conf"} \
 	${makepkg_conf:+-M "$makepkg_conf"} \
 	${mirrors_conf:+-S "$mirrors_conf"} \

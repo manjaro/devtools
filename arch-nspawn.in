@@ -1,4 +1,6 @@
 #!/bin/bash
+# License: GNU GPLv2
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; version 2 of the License.
@@ -13,6 +15,8 @@ m4_include(lib/archroot.sh)
 
 working_dir=''
 
+files=()
+
 usage() {
 	echo "Usage: ${0##*/} [options] working-dir [systemd-nspawn arguments]"
 	echo "A wrapper around systemd-nspawn. Provides support for pacman."
@@ -22,18 +26,22 @@ usage() {
 	echo '    -M <file>     Location of a makepkg config file'
 	echo '    -S <file>     Location of a pacman-mirrors config file'
 	echo '    -c <dir>      Set pacman cache'
+	echo '    -f <file>     Copy file from the host to the chroot'
+	echo '    -s            Do not run setarch'
 	echo '    -h            This message'
 	exit 1
 }
 
-while getopts 'hC:M:S:c:' arg; do
+while getopts 'hC:M:S:c:f:s' arg; do
 	case "$arg" in
 		C) pac_conf="$OPTARG" ;;
 		M) makepkg_conf="$OPTARG" ;;
 		S) mirrors_conf="$OPTARG" ;;
 		c) cache_dir="$OPTARG" ;;
+		f) files+=("$OPTARG") ;;
+		s) nosetarch=1 ;;
 		h|?) usage ;;
-		*) error "invalid argument '$arg'"; usage ;;
+		*) error "invalid argument '%s'" "$arg"; usage ;;
 	esac
 done
 shift $(($OPTIND - 1))
@@ -81,6 +89,12 @@ copy_hostconf () {
 	host_mirror=$(echo "$host_mirror" | sed -E "s#/branch/#/${branch}/#")
 	echo "Server = $host_mirror" >"$working_dir/etc/pacman.d/mirrorlist"
 
+	local file
+	for file in "${files[@]}"; do
+		mkdir -p "$(dirname "$working_dir$file")"
+		cp -T "$file" "$working_dir$file"
+	done
+
 	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n ${cache_dirs[@]})|g" -i "$working_dir/etc/pacman.conf"
 }
 # }}}
@@ -98,6 +112,8 @@ build_mount_args
 copy_hostconf
 
 eval $(grep '^CARCH=' "$working_dir/etc/makepkg.conf")
+
+[[ -z $nosetarch ]] || unset CARCH
 
 exec ${CARCH:+setarch "$CARCH"} systemd-nspawn -q \
 	-D "$working_dir" \

@@ -1,10 +1,18 @@
+#!/hint/bash
+# This may be included with or without `set -euE`
+
+# License: Unspecified
+
+[[ -z ${_INCLUDE_COMMON_SH:-} ]] || return 0
+_INCLUDE_COMMON_SH=true
+
 # Avoid any encoding problems
 export LANG=C
 
 shopt -s extglob
 
 # check if messages are to be printed using color
-unset ALL_OFF BOLD BLUE GREEN RED YELLOW
+declare ALL_OFF='' BOLD='' BLUE='' GREEN='' RED='' YELLOW=''
 if [[ -t 2 ]]; then
 	# prefer terminal safe colored and bold text when tput is supported
 	if tput setaf 0 &>/dev/null; then
@@ -52,19 +60,25 @@ error() {
 
 stat_busy() {
 	local mesg=$1; shift
-	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" >&2
+	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
 	printf "${BOLD}done${ALL_OFF}\n" >&2
 }
 
+_setup_workdir=false
 setup_workdir() {
-	[[ -z $WORKDIR ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
+	[[ -z ${WORKDIR:-} ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
+	_setup_workdir=true
+	trap 'trap_abort' INT QUIT TERM HUP
+	trap 'trap_exit' EXIT
 }
 
 cleanup() {
-	[[ -n $WORKDIR ]] && rm -rf "$WORKDIR"
+	if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
+		rm -rf "$WORKDIR"
+	fi
 	exit ${1:-0}
 }
 
@@ -88,9 +102,6 @@ die() {
 	(( $# )) && error "$@"
 	cleanup 255
 }
-
-trap 'trap_abort' INT QUIT TERM HUP
-trap 'trap_exit' EXIT
 
 ##
 #  usage : in_array( $needle, $haystack )
@@ -135,27 +146,45 @@ get_full_version() {
 }
 
 ##
-#  usage : lock( $fd, $file, $message )
+#  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 lock() {
-	eval "exec $1>"'"$2"'
+	# Only reopen the FD if it wasn't handed to us
+	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+		mkdir -p -- "$(dirname -- "$2")"
+		eval "exec $1>"'"$2"'
+	fi
+
 	if ! flock -n $1; then
-		stat_busy "$3"
+		stat_busy "${@:3}"
 		flock $1
 		stat_done
 	fi
 }
 
 ##
-#  usage : slock( $fd, $file, $message )
+#  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 slock() {
-	eval "exec $1>"'"$2"'
+	# Only reopen the FD if it wasn't handed to us
+	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+		mkdir -p -- "$(dirname -- "$2")"
+		eval "exec $1>"'"$2"'
+	fi
+
 	if ! flock -sn $1; then
-		stat_busy "$3"
+		stat_busy "${@:3}"
 		flock -s $1
 		stat_done
 	fi
+}
+
+##
+#  usage : lock_close( $fd )
+##
+lock_close() {
+	local fd=$1
+	exec {fd}>&-
 }
 
 ##

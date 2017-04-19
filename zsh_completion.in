@@ -1,4 +1,5 @@
-#compdef archbuild arch-nspawn finddeps makechrootpkg mkarchroot rebuildpkgs stable-i686-build=archbuild stable-x86_64-build=archbuild stable-multilib-build=archbuild testing-i686-build=archbuild testing-x86_64-build=archbuild testing-multilib-build=archbuild unstable-i686-build=archbuild unstable-x86_64-build=archbuild unstable-multilib-build=archbuild 
+#compdef archbuild arch-nspawn finddeps makechrootpkg mkarchroot rebuildpkgs stable-i686-build=archbuild stable-x86_64-build=archbuild stable-multilib-build=archbuild testing-i686-build=archbuild testing-x86_64-build=archbuild testing-multilib-build=archbuild unstable-i686-build=archbuild unstable-x86_64-build=archbuild unstable-multilib-build=archbuild
+# License: Unspecified
 
 m4_include(lib/valid-tags.sh)
 
