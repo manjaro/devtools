@@ -92,42 +92,43 @@ load_vars() {
 	[[ -f $makepkg_conf ]] || return 1
 
 	for var in {SRC,SRCPKG,PKG,LOG}DEST MAKEFLAGS PACKAGER; do
-		[[ -z ${!var:-} ]] && eval $(grep "^${var}=" "$makepkg_conf")
+		[[ -z ${!var:-} ]] && eval "$(grep "^${var}=" "$makepkg_conf")"
 	done
 
 	return 0
 }
 
-# Usage: sync_chroot $CHROOTDIR/$CHROOT <$CHROOTCOPY|$copydir>
+# Usage: sync_chroot $rootdir $copydir [$copy]
 sync_chroot() {
-	local chrootdir=$1
-	local copy=$2
-	local copydir=''
-	if [[ ${copy:0:1} = / ]]; then
-		copydir=$copy
-	else
-		copydir="$chrootdir/$copy"
-	fi
+	local rootdir=$1
+	local copydir=$2
+	local copy=${3:-$2}
 
-	if [[ "$chrootdir/root" -ef "$copydir" ]]; then
+	if [[ "$rootdir" -ef "$copydir" ]]; then
 		error 'Cannot sync copy with itself: %s' "$copydir"
 		return 1
 	fi
 
 	# Get a read lock on the root chroot to make
 	# sure we don't clone a half-updated chroot
-	slock 8 "$chrootdir/root.lock" \
-		"Locking clean chroot [%s]" "$chrootdir/root"
+	slock 8 "$rootdir.lock" \
+		"Locking clean chroot [%s]" "$rootdir"
 
-	stat_busy "Synchronizing chroot copy [%s] -> [%s]" "$chrootdir/root" "$copydir"
-	if is_btrfs "$chrootdir" && ! mountpoint -q "$copydir"; then
-		subvolume_delete_recursive "$copydir" ||
-			die "Unable to delete subvolume %s" "$copydir"
-		btrfs subvolume snapshot "$chrootdir/root" "$copydir" >/dev/null ||
+	stat_busy "Synchronizing chroot copy [%s] -> [%s]" "$rootdir" "$copy"
+	if is_subvolume "$rootdir" && is_same_fs "$rootdir" "$(dirname -- "$copydir")" && ! mountpoint -q "$copydir"; then
+		if is_subvolume "$copydir"; then
+			subvolume_delete_recursive "$copydir" ||
+				die "Unable to delete subvolume %s" "$copydir"
+		else
+			# avoid change of filesystem in case of an umount failure
+			rm --recursive --force --one-file-system "$copydir" ||
+				die "Unable to delete %s" "$copydir"
+		fi
+		btrfs subvolume snapshot "$rootdir" "$copydir" >/dev/null ||
 			die "Unable to create subvolume %s" "$copydir"
 	else
 		mkdir -p "$copydir"
-		rsync -a --delete -q -W -x "$chrootdir/root/" "$copydir"
+		rsync -a --delete -q -W -x "$rootdir/" "$copydir"
 	fi
 	stat_done
 
@@ -144,7 +145,7 @@ delete_chroot() {
 	local copy=${1:-$2}
 
 	stat_busy "Removing chroot copy [%s]" "$copy"
-	if is_btrfs "$chrootdir" && ! mountpoint -q "$copydir"; then
+	if is_subvolume "$copydir" && ! mountpoint -q "$copydir"; then
 		subvolume_delete_recursive "$copydir" ||
 			die "Unable to delete subvolume %s" "$copydir"
 	else
@@ -189,8 +190,9 @@ prepare_chroot() {
 
 	$repack || rm -rf "$copydir/build"
 
-	local builduser_uid="${SUDO_UID:-$UID}"
-	local builduser_gid="$(id -g "$builduser_uid")"
+	local builduser_uid builduser_gid
+	builduser_uid="${SUDO_UID:-$UID}"
+	builduser_gid="$(id -g "$builduser_uid")"
 	local install="install -o $builduser_uid -g $builduser_gid"
 	local x
 
@@ -198,8 +200,8 @@ prepare_chroot() {
 	# which we might not be able to load (i.e. when building i686 packages on
 	# an x86_64 host).
 	sed -e '/^builduser:/d' -i "$copydir"/etc/{passwd,group}
-	printf >>"$copydir/etc/group"  'builduser:x:%d:\n' $builduser_gid
-	printf >>"$copydir/etc/passwd" 'builduser:x:%d:%d:builduser:/build:/bin/bash\n' $builduser_uid $builduser_gid
+	printf >>"$copydir/etc/group"  'builduser:x:%d:\n' "$builduser_gid"
+	printf >>"$copydir/etc/passwd" 'builduser:x:%d:%d:builduser:/build:/bin/bash\n' "$builduser_uid" "$builduser_gid"
 
 	$install -d "$copydir"/{build,build/.gnupg,startdir,{pkg,srcpkg,src,log}dest}
 
@@ -239,7 +241,12 @@ EOF
 # These functions aren't run in makechrootpkg,
 # so no global variables
 _chrootbuild() {
+	# shellcheck source=/dev/null
 	. /etc/profile
+	# Beware, there are some stupid arbitrary rules on how you can
+	# use "$" in arguments to commands with "sudo -i".  ${foo} or
+	# ${1} is OK, but $foo or $1 isn't.
+	# https://bugzilla.sudo.ws/show_bug.cgi?id=765
 	sudo -iu builduser bash -c 'cd /startdir; makepkg "$@"' -bash "$@"
 }
 
@@ -251,27 +258,27 @@ _chrootnamcap() {
 	done
 }
 
-# Usage: download_sources $copydir $src_owner
+# Usage: download_sources $copydir $makepkg_user
 # Globals:
 #  - SRCDEST
 #  - USER
 download_sources() {
 	local copydir=$1
-	local src_owner=$2
+	local makepkg_user=$2
 
-	local builddir="$(mktemp -d)"
+	local builddir
+	builddir="$(mktemp -d)"
 	chmod 1777 "$builddir"
 
 	# Ensure sources are downloaded
-	makepkg_user=${makepkg_user:-$SUDO_USER}
-	if [[ -n $makepkg_user ]]; then
+	if [[ "$(id -u "$makepkg_user")" != 0 ]]; then
 		sudo -u "$makepkg_user" env SRCDEST="$SRCDEST" BUILDDIR="$builddir" \
-			makepkg --config="$copydir/etc/makepkg.conf" --verifysource -o
+			makepkg --config="$copydir/etc/makepkg.conf" --verifysource -o ||
+			die "Could not download sources."
 	else
 		error "Running makepkg as root is not allowed."
 		exit 1
 	fi
-	(( $? != 0 )) && die "Could not download sources."
 
 	# Clean up garbage from verifysource
 	rm -rf "$builddir"
@@ -306,6 +313,11 @@ move_products() {
 	for s in "$copydir"/srcpkgdest/*; do
 		chown "$src_owner" "$s"
 		mv "$s" "$SRCPKGDEST"
+
+		# Fix broken symlink because of temporary chroot SRCPKGDEST /srcpkgdest
+		if [[ "$PWD" != "$SRCPKGDEST" && -L "$PWD/${s##*/}" ]]; then
+			ln -sf "$SRCPKGDEST/${s##*/}"
+		fi
 	done
 }
 # }}}
@@ -316,8 +328,8 @@ main() {
 	while getopts 'hcur:I:l:nTD:d:U:' arg; do
 		case "$arg" in
 			c) clean_first=true ;;
-			D) bindmounts_ro+=(--bind-ro="$OPTARG") ;;
-			d) bindmounts_rw+=(--bind="$OPTARG") ;;
+			D) bindmounts_ro+=("--bind-ro=$OPTARG") ;;
+			d) bindmounts_rw+=("--bind=$OPTARG") ;;
 			u) update_first=true ;;
 			r) passeddir="$OPTARG" ;;
 			I) install_pkgs+=("$OPTARG") ;;
@@ -331,6 +343,7 @@ main() {
 
 	[[ ! -f PKGBUILD && -z "${install_pkgs[*]}" ]] && die 'This must be run in a directory containing a PKGBUILD.'
 	[[ -n $makepkg_user && -z $(id -u "$makepkg_user") ]] && die 'Invalid makepkg user.'
+	makepkg_user=${makepkg_user:-${SUDO_USER:-$USER}}
 
 	check_root
 
@@ -379,7 +392,7 @@ main() {
 	lock 9 "$copydir.lock" "Locking chroot copy [%s]" "$copy"
 
 	if [[ ! -d $copydir ]] || $clean_first; then
-		sync_chroot "$chrootdir" "$copy"
+		sync_chroot "$chrootdir/root" "$copydir" "$copy"
 	fi
 
 	$update_first && arch-nspawn "$copydir" \
@@ -393,7 +406,7 @@ main() {
 		[[ -f PKGBUILD ]] || return $ret
 	fi
 
-	download_sources "$copydir" "$src_owner"
+	download_sources "$copydir" "$makepkg_user"
 
 	prepare_chroot "$copydir" "$USER_HOME" "$repack"
 

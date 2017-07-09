@@ -44,7 +44,7 @@ while getopts 'hC:M:S:c:f:s' arg; do
 		*) error "invalid argument '%s'" "$arg"; usage ;;
 	esac
 done
-shift $(($OPTIND - 1))
+shift $((OPTIND - 1))
 
 (( $# < 1 )) && die 'You must specify a directory.'
 check_root
@@ -60,7 +60,9 @@ else
 	cache_dirs=("$cache_dir")
 fi
 
+# shellcheck disable=2016
 host_mirror=$(pacman --cachedir /doesnt/exist -Sddp extra/devtools 2>/dev/null | sed -E "s#(.*/)(.*/)extra/.*#\1branch/\$repo/\$arch#")
+# shellcheck disable=2016
 [[ $host_mirror == *file://* ]] && host_mirror_path=$(echo "$host_mirror" | sed -r 's#file://(/.*)/\$repo/os/\$arch#\1#g')
 
 # {{{ functions
@@ -68,22 +70,22 @@ build_mount_args() {
 	declare -g mount_args=()
 
 	if [[ -n $host_mirror_path ]]; then
-		mount_args+=(--bind-ro="$host_mirror_path")
+		mount_args+=("--bind-ro=$host_mirror_path")
 	fi
 
-	mount_args+=(--bind="${cache_dirs[0]}")
+	mount_args+=("--bind=${cache_dirs[0]}")
 
-	for cache_dir in ${cache_dirs[@]:1}; do
-		mount_args+=(--bind-ro="$cache_dir")
+	for cache_dir in "${cache_dirs[@]:1}"; do
+		mount_args+=("--bind-ro=$cache_dir")
 	done
 }
 
 copy_hostconf () {
 	cp -a /etc/pacman.d/gnupg "$working_dir/etc/pacman.d"
 
-	[[ -n $pac_conf ]] && cp $pac_conf "$working_dir/etc/pacman.conf"
-	[[ -n $makepkg_conf ]] && cp $makepkg_conf "$working_dir/etc/makepkg.conf"
-	[[ -n $mirrors_conf ]] && cp ${mirrors_conf} "${working_dir}/etc/pacman-mirrors.conf"
+	[[ -n $pac_conf ]] && cp "$pac_conf" "$working_dir/etc/pacman.conf"
+	[[ -n $makepkg_conf ]] && cp "$makepkg_conf" "$working_dir/etc/makepkg.conf"
+	[[ -n $mirrors_conf ]] && cp "$mirrors_conf" "$working_dir/etc/pacman-mirrors.conf"
 
 	branch=$(cat "${working_dir}/etc/pacman-mirrors.conf" | grep '^Branch = ' | sed 's/Branch = \s*//g')
 	host_mirror=$(echo "$host_mirror" | sed -E "s#/branch/#/${branch}/#")
@@ -95,7 +97,7 @@ copy_hostconf () {
 		cp -T "$file" "$working_dir$file"
 	done
 
-	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n ${cache_dirs[@]})|g" -i "$working_dir/etc/pacman.conf"
+	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n "${cache_dirs[@]}")|g" -i "$working_dir/etc/pacman.conf"
 }
 # }}}
 
@@ -104,14 +106,14 @@ umask 0022
 # Sanity check
 if [[ ! -f "$working_dir/.manjaro-chroot" ]]; then
 	die "'%s' does not appear to be a Manjaro chroot." "$working_dir"
-elif [[ $(cat "$working_dir/.manjaro-chroot") != $CHROOT_VERSION ]]; then
+elif [[ $(cat "$working_dir/.manjaro-chroot") != "$CHROOT_VERSION" ]]; then
 	die "chroot '%s' is not at version %s. Please rebuild." "$working_dir" "$CHROOT_VERSION"
 fi
 
 build_mount_args
 copy_hostconf
 
-eval $(grep '^CARCH=' "$working_dir/etc/makepkg.conf")
+eval "$(grep '^CARCH=' "$working_dir/etc/makepkg.conf")"
 
 [[ -z $nosetarch ]] || unset CARCH
 

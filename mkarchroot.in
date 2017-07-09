@@ -42,19 +42,19 @@ while getopts 'hC:M:S:c:f:s' arg; do
 		*) error "invalid argument '%s'" "$arg"; usage ;;
 	esac
 done
-shift $(($OPTIND - 1))
+shift $((OPTIND - 1))
 
 (( $# < 2 )) && die 'You must specify a directory and one or more packages.'
 
 check_root
 
-working_dir="$(readlink -f $1)"
+working_dir="$(readlink -f "$1")"
 shift 1
 
 [[ -z $working_dir ]] && die 'Please specify a working directory.'
 
 if [[ -z $cache_dir ]]; then
-	cache_dirs=($(pacman -v $cache_conf 2>&1 | grep '^Cache Dirs:' | sed 's/Cache Dirs:\s*//g'))
+	cache_dirs=($(pacman -v "$cache_conf" 2>&1 | grep '^Cache Dirs:' | sed 's/Cache Dirs:\s*//g'))
 else
 	cache_dirs=(${cache_dir})
 fi

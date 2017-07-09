@@ -35,35 +35,42 @@ readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 
 plain() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${BOLD}    ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg2() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 warning() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 error() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${RED}==> ERROR:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 stat_busy() {
 	local mesg=$1; shift
+	# shellcheck disable=2059
 	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
+	# shellcheck disable=2059
 	printf "${BOLD}done${ALL_OFF}\n" >&2
 }
 
@@ -79,7 +86,7 @@ cleanup() {
 	if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
 		rm -rf "$WORKDIR"
 	fi
-	exit ${1:-0}
+	exit "${1:-0}"
 }
 
 abort() {
@@ -112,7 +119,7 @@ in_array() {
 	local needle=$1; shift
 	local item
 	for item in "$@"; do
-		[[ $item = $needle ]] && return 0 # Found
+		[[ $item = "$needle" ]] && return 0 # Found
 	done
 	return 1 # Not Found
 }
@@ -123,24 +130,27 @@ in_array() {
 ##
 get_full_version() {
 	# set defaults if they weren't specified in buildfile
-	pkgbase=${pkgbase:-${pkgname[0]}}
-	epoch=${epoch:-0}
+	local pkgbase=${pkgbase:-${pkgname[0]}}
+	local epoch=${epoch:-0}
+	local pkgver=${pkgver}
+	local pkgrel=${pkgrel}
 	if [[ -z $1 ]]; then
 		if (( ! epoch )); then
-			echo $pkgver-$pkgrel
+			printf '%s\n' "$pkgver-$pkgrel"
 		else
-			echo $epoch:$pkgver-$pkgrel
+			printf '%s\n' "$epoch:$pkgver-$pkgrel"
 		fi
 	else
+		local pkgver_override='' pkgrel_override='' epoch_override=''
 		for i in pkgver pkgrel epoch; do
 			local indirect="${i}_override"
-			eval $(declare -f package_$1 | sed -n "s/\(^[[:space:]]*$i=\)/${i}_override=/p")
+			eval "$(declare -f "package_$1" | sed -n "s/\(^[[:space:]]*$i=\)/${i}_override=/p")"
 			[[ -z ${!indirect} ]] && eval ${indirect}=\"${!i}\"
 		done
-		if (( ! $epoch_override )); then
-			echo $pkgver_override-$pkgrel_override
+		if (( ! epoch_override )); then
+			printf '%s\n' "$pkgver_override-$pkgrel_override"
 		else
-			echo $epoch_override:$pkgver_override-$pkgrel_override
+			printf '%s\n' "$epoch_override:$pkgver_override-$pkgrel_override"
 		fi
 	fi
 }
@@ -155,9 +165,9 @@ lock() {
 		eval "exec $1>"'"$2"'
 	fi
 
-	if ! flock -n $1; then
+	if ! flock -n "$1"; then
 		stat_busy "${@:3}"
-		flock $1
+		flock "$1"
 		stat_done
 	fi
 }
@@ -172,9 +182,9 @@ slock() {
 		eval "exec $1>"'"$2"'
 	fi
 
-	if ! flock -sn $1; then
+	if ! flock -sn "$1"; then
 		stat_busy "${@:3}"
-		flock -s $1
+		flock -s "$1"
 		stat_done
 	fi
 }
@@ -184,6 +194,8 @@ slock() {
 ##
 lock_close() {
 	local fd=$1
+	# https://github.com/koalaman/shellcheck/issues/862
+	# shellcheck disable=2034
 	exec {fd}>&-
 }
 
@@ -247,7 +259,7 @@ find_cached_package() {
 			return 1
 			;;
 		1)
-			printf '%s\n' "$results"
+			printf '%s\n' "${results[0]}"
 			return 0
 			;;
 		*)

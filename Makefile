@@ -42,7 +42,7 @@ edit = sed -e "s|@pkgdatadir[@]|$(DESTDIR)$(PREFIX)/share/devtools|g"
 %: %.in Makefile lib/common.sh
 	@echo "GEN $@"
 	@$(RM) "$@"
-	@m4 -P $@.in | $(edit) >$@
+	@{ echo -n 'm4_changequote([[[,]]])'; cat $@.in; } | m4 -P | $(edit) >$@
 	@chmod a-w "$@"
 	@chmod +x "$@"
 	@bash -O extglob -n "$@"
@@ -78,4 +78,8 @@ dist:
 	git archive --format=tar --prefix=devtools-$(V)/ $(V) | gzip -9 > devtools-$(V).tar.gz
 	gpg --detach-sign --use-agent devtools-$(V).tar.gz
 
+check: $(BINPROGS) bash_completion makepkg-x86_64.conf PKGBUILD.proto
+	shellcheck $^
+
 .PHONY: all clean install uninstall dist
+.DELETE_ON_ERROR:

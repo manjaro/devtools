@@ -7,6 +7,7 @@ m4_include(lib/common.sh)
 
 # Source makepkg.conf; fail if it is not found
 if [[ -r '/etc/makepkg.conf' ]]; then
+	# shellcheck source=makepkg-x86_64.conf
 	source '/etc/makepkg.conf'
 else
 	die '/etc/makepkg.conf not found!'
@@ -14,8 +15,10 @@ fi
 
 # Source user-specific makepkg.conf overrides
 if [[ -r "${XDG_CONFIG_HOME:-$HOME/.config}/pacman/makepkg.conf" ]]; then
+	# shellcheck source=/dev/null
 	source "${XDG_CONFIG_HOME:-$HOME/.config}/pacman/makepkg.conf"
 elif [[ -r "$HOME/.makepkg.conf" ]]; then
+	# shellcheck source=/dev/null
 	source "$HOME/.makepkg.conf"
 fi
 
@@ -23,8 +26,9 @@ if [[ ! -f PKGBUILD ]]; then
 	die 'This must be run in the directory of a built package.'
 fi
 
+# shellcheck source=PKGBUILD.proto
 . ./PKGBUILD
-if [[ $arch == 'any' ]]; then
+if [[ ${arch[0]} == 'any' ]]; then
 	CARCH='any'
 fi
 
@@ -39,15 +43,12 @@ for _pkgname in "${pkgname[@]}"; do
 
 	ln -s "$pkgfile" "$TEMPDIR"
 
-	pkgurl=$(pacman -Spdd --print-format '%l' --noconfirm "$_pkgname")
-
-	if [[ $? -ne 0 ]]; then
+	pkgurl=$(pacman -Spdd --print-format '%l' --noconfirm "$_pkgname") ||
 		die "Couldn't download previous package for %s." "$_pkgname"
-	fi
 
 	oldpkg=${pkgurl##*://*/}
 
-	if [[ ${oldpkg##*/} = ${pkgfile##*/} ]]; then
+	if [[ ${oldpkg##*/} = "${pkgfile##*/}" ]]; then
 		die "The built package (%s) is the one in the repo right now!" "$_pkgname"
 	fi
 
