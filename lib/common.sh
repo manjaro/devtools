@@ -14,100 +14,100 @@ shopt -s extglob
 # check if messages are to be printed using color
 declare ALL_OFF='' BOLD='' BLUE='' GREEN='' RED='' YELLOW=''
 if [[ -t 2 ]]; then
-	# prefer terminal safe colored and bold text when tput is supported
-	if tput setaf 0 &>/dev/null; then
-		ALL_OFF="$(tput sgr0)"
-		BOLD="$(tput bold)"
-		BLUE="${BOLD}$(tput setaf 4)"
-		GREEN="${BOLD}$(tput setaf 2)"
-		RED="${BOLD}$(tput setaf 1)"
-		YELLOW="${BOLD}$(tput setaf 3)"
-	else
-		ALL_OFF="\e[1;0m"
-		BOLD="\e[1;1m"
-		BLUE="${BOLD}\e[1;34m"
-		GREEN="${BOLD}\e[1;32m"
-		RED="${BOLD}\e[1;31m"
-		YELLOW="${BOLD}\e[1;33m"
-	fi
+    # prefer terminal safe colored and bold text when tput is supported
+    if tput setaf 0 &>/dev/null; then
+        ALL_OFF="$(tput sgr0)"
+        BOLD="$(tput bold)"
+        BLUE="${BOLD}$(tput setaf 4)"
+        GREEN="${BOLD}$(tput setaf 2)"
+        RED="${BOLD}$(tput setaf 1)"
+        YELLOW="${BOLD}$(tput setaf 3)"
+    else
+        ALL_OFF="\e[1;0m"
+        BOLD="\e[1;1m"
+        BLUE="${BOLD}\e[1;34m"
+        GREEN="${BOLD}\e[1;32m"
+        RED="${BOLD}\e[1;31m"
+        YELLOW="${BOLD}\e[1;33m"
+    fi
 fi
 readonly ALL_OFF BOLD BLUE GREEN RED YELLOW
 
 plain() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${BOLD}    ${mesg}${ALL_OFF}\n" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${BOLD}    ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 msg2() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${BLUE}  ->${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 warning() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${YELLOW}==> WARNING:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 error() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${RED}==> ERROR:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${RED}==> ERROR:${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
 }
 
 stat_busy() {
-	local mesg=$1; shift
-	# shellcheck disable=2059
-	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
+    local mesg=$1; shift
+    # shellcheck disable=2059
+    printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}...${ALL_OFF}" "$@" >&2
 }
 
 stat_done() {
-	# shellcheck disable=2059
-	printf "${BOLD}done${ALL_OFF}\n" >&2
+    # shellcheck disable=2059
+    printf "${BOLD}done${ALL_OFF}\n" >&2
 }
 
 _setup_workdir=false
 setup_workdir() {
-	[[ -z ${WORKDIR:-} ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
-	_setup_workdir=true
-	trap 'trap_abort' INT QUIT TERM HUP
-	trap 'trap_exit' EXIT
+    [[ -z ${WORKDIR:-} ]] && WORKDIR=$(mktemp -d --tmpdir "${0##*/}.XXXXXXXXXX")
+    _setup_workdir=true
+    trap 'trap_abort' INT QUIT TERM HUP
+    trap 'trap_exit' EXIT
 }
 
 cleanup() {
-	if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
-		rm -rf "$WORKDIR"
-	fi
-	exit "${1:-0}"
+    if [[ -n ${WORKDIR:-} ]] && $_setup_workdir; then
+        rm -rf "$WORKDIR"
+    fi
+    exit "${1:-0}"
 }
 
 abort() {
-	error 'Aborting...'
-	cleanup 255
+    error 'Aborting...'
+    cleanup 255
 }
 
 trap_abort() {
-	trap - EXIT INT QUIT TERM HUP
-	abort
+    trap - EXIT INT QUIT TERM HUP
+    abort
 }
 
 trap_exit() {
-	local r=$?
-	trap - EXIT INT QUIT TERM HUP
-	cleanup $r
+    local r=$?
+    trap - EXIT INT QUIT TERM HUP
+    cleanup $r
 }
 
 die() {
-	(( $# )) && error "$@"
-	cleanup 255
+    (( $# )) && error "$@"
+    cleanup 255
 }
 
 ##
@@ -116,12 +116,12 @@ die() {
 #          1 - not found
 ##
 in_array() {
-	local needle=$1; shift
-	local item
-	for item in "$@"; do
-		[[ $item = "$needle" ]] && return 0 # Found
-	done
-	return 1 # Not Found
+    local needle=$1; shift
+    local item
+    for item in "$@"; do
+        [[ $item = "$needle" ]] && return 0 # Found
+    done
+    return 1 # Not Found
 }
 
 ##
@@ -129,87 +129,87 @@ in_array() {
 # return : full version spec, including epoch (if necessary), pkgver, pkgrel
 ##
 get_full_version() {
-	# set defaults if they weren't specified in buildfile
-	local pkgbase=${pkgbase:-${pkgname[0]}}
-	local epoch=${epoch:-0}
-	local pkgver=${pkgver}
-	local pkgrel=${pkgrel}
-	if [[ -z $1 ]]; then
-		if (( ! epoch )); then
-			printf '%s\n' "$pkgver-$pkgrel"
-		else
-			printf '%s\n' "$epoch:$pkgver-$pkgrel"
-		fi
-	else
-		local pkgver_override='' pkgrel_override='' epoch_override=''
-		for i in pkgver pkgrel epoch; do
-			local indirect="${i}_override"
-			eval "$(declare -f "package_$1" | sed -n "s/\(^[[:space:]]*$i=\)/${i}_override=/p")"
-			[[ -z ${!indirect} ]] && eval ${indirect}=\"${!i}\"
-		done
-		if (( ! epoch_override )); then
-			printf '%s\n' "$pkgver_override-$pkgrel_override"
-		else
-			printf '%s\n' "$epoch_override:$pkgver_override-$pkgrel_override"
-		fi
-	fi
+    # set defaults if they weren't specified in buildfile
+    local pkgbase=${pkgbase:-${pkgname[0]}}
+    local epoch=${epoch:-0}
+    local pkgver=${pkgver}
+    local pkgrel=${pkgrel}
+    if [[ -z $1 ]]; then
+        if (( ! epoch )); then
+            printf '%s\n' "$pkgver-$pkgrel"
+        else
+            printf '%s\n' "$epoch:$pkgver-$pkgrel"
+        fi
+    else
+        local pkgver_override='' pkgrel_override='' epoch_override=''
+        for i in pkgver pkgrel epoch; do
+            local indirect="${i}_override"
+            eval "$(declare -f "package_$1" | sed -n "s/\(^[[:space:]]*$i=\)/${i}_override=/p")"
+            [[ -z ${!indirect} ]] && eval ${indirect}=\"${!i}\"
+        done
+        if (( ! epoch_override )); then
+            printf '%s\n' "$pkgver_override-$pkgrel_override"
+        else
+            printf '%s\n' "$epoch_override:$pkgver_override-$pkgrel_override"
+        fi
+    fi
 }
 
 ##
 #  usage : lock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 lock() {
-	# Only reopen the FD if it wasn't handed to us
-	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
-		mkdir -p -- "$(dirname -- "$2")"
-		eval "exec $1>"'"$2"'
-	fi
+    # Only reopen the FD if it wasn't handed to us
+    if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+        mkdir -p -- "$(dirname -- "$2")"
+        eval "exec $1>"'"$2"'
+    fi
 
-	if ! flock -n "$1"; then
-		stat_busy "${@:3}"
-		flock "$1"
-		stat_done
-	fi
+    if ! flock -n "$1"; then
+        stat_busy "${@:3}"
+        flock "$1"
+        stat_done
+    fi
 }
 
 ##
 #  usage : slock( $fd, $file, $message, [ $message_arguments... ] )
 ##
 slock() {
-	# Only reopen the FD if it wasn't handed to us
-	if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
-		mkdir -p -- "$(dirname -- "$2")"
-		eval "exec $1>"'"$2"'
-	fi
+    # Only reopen the FD if it wasn't handed to us
+    if ! [[ "/dev/fd/$1" -ef "$2" ]]; then
+        mkdir -p -- "$(dirname -- "$2")"
+        eval "exec $1>"'"$2"'
+    fi
 
-	if ! flock -sn "$1"; then
-		stat_busy "${@:3}"
-		flock -s "$1"
-		stat_done
-	fi
+    if ! flock -sn "$1"; then
+        stat_busy "${@:3}"
+        flock -s "$1"
+        stat_done
+    fi
 }
 
 ##
 #  usage : lock_close( $fd )
 ##
 lock_close() {
-	local fd=$1
-	# https://github.com/koalaman/shellcheck/issues/862
-	# shellcheck disable=2034
-	exec {fd}>&-
+    local fd=$1
+    # https://github.com/koalaman/shellcheck/issues/862
+    # shellcheck disable=2034
+    exec {fd}>&-
 }
 
 ##
 # usage: pkgver_equal( $pkgver1, $pkgver2 )
 ##
 pkgver_equal() {
-	if [[ $1 = *-* && $2 = *-* ]]; then
-		# if both versions have a pkgrel, then they must be an exact match
-		[[ $1 = "$2" ]]
-	else
-		# otherwise, trim any pkgrel and compare the bare version.
-		[[ ${1%%-*} = "${2%%-*}" ]]
-	fi
+    if [[ $1 = *-* && $2 = *-* ]]; then
+        # if both versions have a pkgrel, then they must be an exact match
+        [[ $1 = "$2" ]]
+    else
+        # otherwise, trim any pkgrel and compare the bare version.
+        [[ ${1%%-*} = "${2%%-*}" ]]
+    fi
 }
 
 ##
@@ -219,52 +219,52 @@ pkgver_equal() {
 #    If not supplied, any pkgrel will be matched.
 ##
 find_cached_package() {
-	local searchdirs=("$PWD" "$PKGDEST") results=()
-	local targetname=$1 targetver=$2 targetarch=$3
-	local dir pkg pkgbasename name ver rel arch r results
+    local searchdirs=("$PWD" "$PKGDEST") results=()
+    local targetname=$1 targetver=$2 targetarch=$3
+    local dir pkg pkgbasename name ver rel arch r results
 
-	for dir in "${searchdirs[@]}"; do
-		[[ -d $dir ]] || continue
+    for dir in "${searchdirs[@]}"; do
+        [[ -d $dir ]] || continue
 
-		for pkg in "$dir"/*.pkg.tar?(.?z); do
-			[[ -f $pkg ]] || continue
+        for pkg in "$dir"/*.pkg.tar?(.?z); do
+            [[ -f $pkg ]] || continue
 
-			# avoid adding duplicates of the same inode
-			for r in "${results[@]}"; do
-				[[ $r -ef $pkg ]] && continue 2
-			done
+            # avoid adding duplicates of the same inode
+            for r in "${results[@]}"; do
+                [[ $r -ef $pkg ]] && continue 2
+            done
 
-			# split apart package filename into parts
-			pkgbasename=${pkg##*/}
-			pkgbasename=${pkgbasename%.pkg.tar?(.?z)}
+            # split apart package filename into parts
+            pkgbasename=${pkg##*/}
+            pkgbasename=${pkgbasename%.pkg.tar?(.?z)}
 
-			arch=${pkgbasename##*-}
-			pkgbasename=${pkgbasename%-"$arch"}
+            arch=${pkgbasename##*-}
+            pkgbasename=${pkgbasename%-"$arch"}
 
-			rel=${pkgbasename##*-}
-			pkgbasename=${pkgbasename%-"$rel"}
+            rel=${pkgbasename##*-}
+            pkgbasename=${pkgbasename%-"$rel"}
 
-			ver=${pkgbasename##*-}
-			name=${pkgbasename%-"$ver"}
+            ver=${pkgbasename##*-}
+            name=${pkgbasename%-"$ver"}
 
-			if [[ $targetname = "$name" && $targetarch = "$arch" ]] &&
-					pkgver_equal "$targetver" "$ver-$rel"; then
-				results+=("$pkg")
-			fi
-		done
-	done
+            if [[ $targetname = "$name" && $targetarch = "$arch" ]] &&
+                    pkgver_equal "$targetver" "$ver-$rel"; then
+                results+=("$pkg")
+            fi
+        done
+    done
 
-	case ${#results[*]} in
-		0)
-			return 1
-			;;
-		1)
-			printf '%s\n' "${results[0]}"
-			return 0
-			;;
-		*)
-			error 'Multiple packages found:'
-			printf '\t%s\n' "${results[@]}" >&2
-			return 1
-	esac
+    case ${#results[*]} in
+        0)
+            return 1
+            ;;
+        1)
+            printf '%s\n' "${results[0]}"
+            return 0
+            ;;
+        *)
+            error 'Multiple packages found:'
+            printf '\t%s\n' "${results[@]}" >&2
+            return 1
+    esac
 }
