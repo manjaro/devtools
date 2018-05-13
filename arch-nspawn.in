@@ -97,7 +97,7 @@ copy_hostconf () {
 		cp -T "$file" "$working_dir$file"
 	done
 
-	sed -r "s|^#?\\s*CacheDir.+|CacheDir = $(echo -n "${cache_dirs[@]}")|g" -i "$working_dir/etc/pacman.conf"
+	sed -r "s|^#?\\s*CacheDir.+|CacheDir = ${cache_dirs[*]}|g" -i "$working_dir/etc/pacman.conf"
 }
 # }}}
 
@@ -113,13 +113,13 @@ fi
 build_mount_args
 copy_hostconf
 
-eval "$(grep '^CARCH=' "$working_dir/etc/makepkg.conf")"
+eval "$(grep -a '^CARCH=' "$working_dir/etc/makepkg.conf")"
 
 [[ -z $nosetarch ]] || unset CARCH
 
 exec ${CARCH:+setarch "$CARCH"} systemd-nspawn -q \
 	-D "$working_dir" \
 	-E "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin" \
-	--register=no --keep-unit \
+	--register=no --keep-unit --as-pid2 \
 	"${mount_args[@]}" \
 	"$@"
