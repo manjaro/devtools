@@ -1,27 +1,12 @@
 #!/bin/bash
+# License: Unspecified
 
-
-err() {
-    ALL_OFF="\e[1;0m"
-    BOLD="\e[1;1m"
-    RED="${BOLD}\e[1;31m"
-	local mesg=$1; shift
-	printf "${RED}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
-}
-
-msg() {
-    ALL_OFF="\e[1;0m"
-    BOLD="\e[1;1m"
-    GREEN="${BOLD}\e[1;32m"
-	local mesg=$1; shift
-	printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
-}
-
+m4_include(lib/common.sh)
 
 . /etc/makepkg.conf
 
 if [ ! -e "$1" ]; then
-	err "Package '$1' does not exists!"
+	error "Package '$1' does not exists!"
 	exit 1
 fi
 
