@@ -1,4 +1,5 @@
-devtools
-========
+This repo has been archived. Our code is now hosted at
 
-Package Development Tools for Manjaro Linux
+https://gitlab.manjaro.org/
+
+See you there!
